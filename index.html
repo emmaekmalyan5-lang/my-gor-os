@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GOR Dashboard OS</title>
+    <link rel="stylesheet" href="./style.css">
+</head>
+
+<body>
+
+    <iframe id="html-bg-container"></iframe>
+    <div class="grid-bg"></div>
+
+    <div class="header">
+        <div class="brand-zone">
+            <div class="brand" id="os-brand-logo">GOR // OS</div>
+            <button class="settings-btn" id="open-bg-settings" title="Настройки оформления">⚙</button>
+            <button class="settings-btn" id="open-widgets-panel" title="Виджеты">🧩</button>
+            <input type="file" id="bg-input" accept="image/*, text/html" style="display: none;">
+        </div>
+        <div class="clock-container">
+            <div id="clock">00:00:00</div>
+            <div id="date">Загрузка...</div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <form id="search-form" action="https://www.google.com/search" method="get" class="search-box">
+            <span class="search-icon" id="search-icon-label">🔍</span>
+            <input type="text" id="search-input" placeholder="Поиск или URL..." autofocus autocomplete="off">
+        </form>
+
+        <div class="shortcuts-grid" id="shortcuts-container"></div>
+    </div>
+
+    <div id="widgets-panel">
+        <div class="widgets-panel-header">
+            <button class="widgets-close" id="widget-settings-btn" title="Настройка виджетов">⚙</button>
+            <button class="widgets-close" id="widgets-close" title="Закрыть">✕</button>
+        </div>
+
+        <div class="widget-card" id="weather-widget">
+            <div class="widget-header">
+                <span class="widget-title">Погода</span>
+                <button class="widget-refresh" id="weather-refresh" title="Обновить">↻</button>
+            </div>
+            <div class="widget-body" id="weather-body">
+                <div class="weather-status">Определяем местоположение…</div>
+            </div>
+        </div>
+
+        <div class="widget-card" id="calculator-widget">
+            <div class="widget-header">
+                <span class="widget-title">Калькулятор</span>
+                <button class="widget-refresh" id="calc-clear-all" title="Сбросить">C</button>
+            </div>
+            <div class="widget-body">
+                <div class="calc-display" id="calc-display">0</div>
+                <div class="calc-grid">
+                    <button class="calc-btn calc-op" data-action="clear">AC</button>
+                    <button class="calc-btn calc-op" data-action="sign">+/-</button>
+                    <button class="calc-btn calc-op" data-action="percent">%</button>
+                    <button class="calc-btn calc-op calc-accent" data-op="/">÷</button>
+
+                    <button class="calc-btn" data-num="7">7</button>
+                    <button class="calc-btn" data-num="8">8</button>
+                    <button class="calc-btn" data-num="9">9</button>
+                    <button class="calc-btn calc-op calc-accent" data-op="*">×</button>
+
+                    <button class="calc-btn" data-num="4">4</button>
+                    <button class="calc-btn" data-num="5">5</button>
+                    <button class="calc-btn" data-num="6">6</button>
+                    <button class="calc-btn calc-op calc-accent" data-op="-">−</button>
+
+                    <button class="calc-btn" data-num="1">1</button>
+                    <button class="calc-btn" data-num="2">2</button>
+                    <button class="calc-btn" data-num="3">3</button>
+                    <button class="calc-btn calc-op calc-accent" data-op="+">+</button>
+
+                    <button class="calc-btn calc-zero" data-num="0">0</button>
+                    <button class="calc-btn" data-action="decimal">,</button>
+                    <button class="calc-btn calc-op calc-accent calc-equals" data-action="equals">=</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="widget-card" id="todo-widget">
+            <div class="widget-header">
+                <span class="widget-title">Дела</span>
+            </div>
+            <div class="widget-body">
+                <form id="todo-form" class="todo-form">
+                    <input type="text" id="todo-input" placeholder="Новая задача...">
+                    <button type="submit" class="btn btn-primary todo-add-btn">+</button>
+                </form>
+                <div class="todo-list" id="todo-list"></div>
+            </div>
+        </div>
+
+        <div class="widget-card" id="notes-widget">
+            <div class="widget-header">
+                <span class="widget-title">Заметки</span>
+                <span class="widget-save-hint" id="notes-save-hint"></span>
+            </div>
+            <div class="widget-body">
+                <textarea id="notes-textarea" placeholder="Пиши сюда что угодно, сохранится автоматически..."></textarea>
+            </div>
+        </div>
+
+        <div id="custom-widgets-container"></div>
+    </div>
+
+    <div class="footer">
+        <img class="running-fox" src="fox-loading.gif" alt="Running Fox"
+            onerror="this.style.display='none'">
+    </div>
+
+    <div id="context-menu">
+        <div class="menu-item" id="ctx-edit">Редактировать</div>
+        <div class="menu-item" id="ctx-delete" style="color: #ff6b6b;">Удалить</div>
+    </div>
+
+    <div class="modal" id="site-modal">
+        <div class="modal-content">
+            <h3 id="modal-title">Добавить ярлык</h3>
+            <input type="text" id="site-name" placeholder="Название сайта (например: GitHub)">
+            <input type="text" id="site-url" placeholder="URL-адрес (например: https://github.com)">
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" id="modal-cancel">Отмена</button>
+                <button class="btn btn-primary" id="modal-save">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="bg-modal">
+        <div class="modal-content modal-content-tabbed">
+
+            <div class="modal-tabs" id="modal-tabs">
+                <button class="modal-tab active" data-tab="tab-system">Система</button>
+                <button class="modal-tab" data-tab="tab-color">Цвет</button>
+                <button class="modal-tab" data-tab="tab-bg">Фон</button>
+                <button class="modal-tab" data-tab="tab-search">Поиск</button>
+            </div>
+
+            <div class="modal-tab-panels">
+
+                <div class="tab-panel active" id="tab-system">
+                    <h3>Система и Брендинг</h3>
+                    <div class="settings-card">
+                        <div class="setting-group">
+                            <label for="brand-text-input">Название системы:</label>
+                            <input type="text" id="brand-text-input" placeholder="Введите название (например: GOR // OS)">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-panel" id="tab-color">
+                    <h3>Контекстный цвет системы</h3>
+                    <div class="settings-card">
+                        <div class="setting-group">
+                            <label>Выберите акцентный цвет интерфейса:</label>
+                            <div class="color-picker-wrapper">
+                                <div class="color-preset active" data-color="#4c6ef5" style="background: #4c6ef5;"></div>
+                                <div class="color-preset" data-color="#22c55e" style="background: #22c55e;"></div>
+                                <div class="color-preset" data-color="#ec4899" style="background: #ec4899;"></div>
+                                <div class="color-preset" data-color="#ef4444" style="background: #ef4444;"></div>
+                                <div class="color-preset" data-color="#f59e0b" style="background: #f59e0b;"></div>
+                                <span style="font-size: 0.8rem; color: #868e96; margin-left: 5px;">Свой:</span>
+                                <input type="color" id="custom-color-picker" class="custom-color-input" value="#4c6ef5">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-panel" id="tab-bg">
+                    <h3>Задний план и Эффекты</h3>
+                    <div class="settings-card">
+                        <button class="btn btn-primary" id="choose-file-btn">Загрузить картинку / GIF / HTML</button>
+
+                        <div class="setting-group" style="margin-top: 5px;">
+                            <label for="blur-slider">Размытие заднего фона: <span id="blur-val">0px</span></label>
+                            <input type="range" id="blur-slider" min="0" max="20" value="0">
+                        </div>
+
+                        <div class="setting-group-row" style="margin-top: 5px;">
+                            <label for="interact-checkbox">Разрешить клики сквозь панель по фону</label>
+                            <input type="checkbox" id="interact-checkbox">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-panel" id="tab-search">
+                    <h3>Поисковые системы</h3>
+                    <div class="settings-card">
+                        <div class="setting-group">
+                            <label for="engine-select">Активная поисковая система:</label>
+                            <select id="engine-select"></select>
+                        </div>
+
+                        <div class="engine-builder" style="margin-top: 5px;">
+                            <span style="font-size: 0.85rem; font-weight: 600; color: #dee2e6;">Создать поисковик
+                                (Firefox-style)</span>
+                            <input type="text" id="custom-engine-name" placeholder="Название (например: Bing)">
+                            <input type="text" id="custom-engine-url"
+                                placeholder="Ссылка запроса (например: https://www.bing.com/search?q=)">
+                            <button class="btn btn-primary" id="add-custom-engine-btn"
+                                style="padding: 8px; font-size: 0.85rem;">+ Добавить поисковик</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <button class="btn btn-danger" id="reset-bg-btn">⚠️ Сбросить абсолютно ВСЁ</button>
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" id="bg-modal-close">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="widget-settings-modal">
+        <div class="modal-content modal-content-tabbed">
+
+            <div class="modal-tabs" id="widget-modal-tabs">
+                <button class="modal-tab active" data-tab="wtab-visibility">Видимость</button>
+                <button class="modal-tab" data-tab="wtab-create">Свой виджет</button>
+            </div>
+
+            <div class="modal-tab-panels">
+
+                <div class="tab-panel active" id="wtab-visibility">
+                    <h3>Показывать / скрывать виджеты</h3>
+                    <div class="settings-card" id="builtin-visibility-list">
+                        <div class="setting-group-row">
+                            <label for="vis-weather-widget">Погода</label>
+                            <input type="checkbox" class="widget-vis-toggle" id="vis-weather-widget" data-widget-id="weather-widget" checked>
+                        </div>
+                        <div class="setting-group-row">
+                            <label for="vis-calculator-widget">Калькулятор</label>
+                            <input type="checkbox" class="widget-vis-toggle" id="vis-calculator-widget" data-widget-id="calculator-widget" checked>
+                        </div>
+                        <div class="setting-group-row">
+                            <label for="vis-todo-widget">Дела</label>
+                            <input type="checkbox" class="widget-vis-toggle" id="vis-todo-widget" data-widget-id="todo-widget" checked>
+                        </div>
+                        <div class="setting-group-row">
+                            <label for="vis-notes-widget">Заметки</label>
+                            <input type="checkbox" class="widget-vis-toggle" id="vis-notes-widget" data-widget-id="notes-widget" checked>
+                        </div>
+                    </div>
+
+                    <h3>Мои виджеты</h3>
+                    <div class="settings-card" id="custom-widgets-manage-list">
+                        <div class="widget-empty-hint">Пока нет своих виджетов</div>
+                    </div>
+                </div>
+
+                <div class="tab-panel" id="wtab-create">
+                    <h3>Добавить свой виджет</h3>
+                    <div class="settings-card">
+                        <div class="setting-group">
+                            <label for="custom-widget-name">Название виджета:</label>
+                            <input type="text" id="custom-widget-name" placeholder="Например: Мой таймер">
+                        </div>
+                        <div class="setting-group">
+                            <label for="custom-widget-html">HTML:</label>
+                            <textarea id="custom-widget-html" class="code-textarea" rows="4" placeholder="<div>Привет!</div>"></textarea>
+                        </div>
+                        <div class="setting-group">
+                            <label for="custom-widget-css">CSS:</label>
+                            <textarea id="custom-widget-css" class="code-textarea" rows="4" placeholder="div { color: white; }"></textarea>
+                        </div>
+                        <div class="setting-group">
+                            <label for="custom-widget-js">JS:</label>
+                            <textarea id="custom-widget-js" class="code-textarea" rows="4" placeholder="console.log('widget loaded')"></textarea>
+                        </div>
+                        <button class="btn btn-primary" id="custom-widget-add-btn">+ Добавить виджет</button>
+                        <span style="font-size:0.75rem; color:#868e96;">Доступна CSS-переменная --accent-color. Код выполняется в изолированном iframe.</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" id="widget-settings-close">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="./script.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,896 @@
+const defaultSites = [
+    { name: 'Tumo Portal', url: 'https://tumo.org' },
+    { name: 'GitHub', url: 'https://github.com' },
+    { name: 'YouTube', url: 'https://youtube.com' },
+    { name: 'Gemini AI', url: 'https://gemini.google.com' }
+];
+
+const defaultEngines = [
+    { name: 'Google', url: 'https://www.google.com/search', param: 'q' },
+    { name: 'DuckDuckGo', url: 'https://duckduckgo.com/', param: 'q' },
+    { name: 'Yandex', url: 'https://yandex.ru/search/', param: 'text' }
+];
+
+let shortcuts = JSON.parse(localStorage.getItem('gor_shortcuts')) || defaultSites;
+let engines = JSON.parse(localStorage.getItem('gor_custom_engines_list')) || defaultEngines;
+let currentEngineIndex = parseInt(localStorage.getItem('gor_search_engine_idx')) || 0;
+let currentTargetIndex = null;
+
+const container = document.getElementById('shortcuts-container');
+const ctxMenu = document.getElementById('context-menu');
+const siteModal = document.getElementById('site-modal');
+const bgModal = document.getElementById('bg-modal');
+const iframeBg = document.getElementById('html-bg-container');
+
+const blurSlider = document.getElementById('blur-slider');
+const blurVal = document.getElementById('blur-val');
+const interactCheckbox = document.getElementById('interact-checkbox');
+const brandTextInput = document.getElementById('brand-text-input');
+const osBrandLogo = document.getElementById('os-brand-logo');
+
+const engineSelect = document.getElementById('engine-select');
+const searchForm = document.getElementById('search-form');
+const searchInput = document.getElementById('search-input');
+const customColorPicker = document.getElementById('custom-color-picker');
+
+function getCleanDomain(url) {
+    try {
+        let cleanUrl = url.trim();
+        if (!/^https?:\/\//i.test(cleanUrl)) cleanUrl = 'https://' + cleanUrl;
+        return new URL(cleanUrl).hostname;
+    } catch (e) { return ''; }
+}
+
+function renderShortcuts() {
+    container.innerHTML = '';
+    shortcuts.forEach((site, index) => {
+        const card = document.createElement('a');
+        card.className = 'shortcut-card';
+        card.href = site.url;
+        card.dataset.index = index;
+
+        const domain = getCleanDomain(site.url);
+        const firstLetter = site.name ? site.name.charAt(0) : '?';
+
+        if (domain) {
+            const faviconUrl = `https://www.google.com/s2/favicons?sz=64&domain=${domain}`;
+            card.innerHTML = `
+                        <img class="shortcut-icon" src="${faviconUrl}" alt="" onerror="handleImgError(this, '${firstLetter}')">
+                        <div class="shortcut-name">${site.name}</div>
+                    `;
+        } else {
+            card.innerHTML = `
+                        <div class="shortcut-letter-icon">${firstLetter}</div>
+                        <div class="shortcut-name">${site.name}</div>
+                    `;
+        }
+
+        card.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            currentTargetIndex = index;
+            ctxMenu.style.top = `${e.pageY}px`;
+            ctxMenu.style.left = `${e.pageX}px`;
+            ctxMenu.style.display = 'flex';
+        });
+
+        container.appendChild(card);
+    });
+
+    const addCard = document.createElement('div');
+    addCard.className = 'shortcut-card add-btn';
+    addCard.innerHTML = '+';
+    addCard.addEventListener('click', () => openSiteModal(null));
+    container.appendChild(addCard);
+}
+
+function handleImgError(img, letter) {
+    const parent = img.parentNode;
+    const letterDiv = document.createElement('div');
+    letterDiv.className = 'shortcut-letter-icon';
+    letterDiv.textContent = letter;
+    parent.replaceChild(letterDiv, img);
+}
+
+function saveShortcuts() {
+    localStorage.setItem('gor_shortcuts', JSON.stringify(shortcuts));
+    renderShortcuts();
+}
+
+function openSiteModal(index) {
+    ctxMenu.style.display = 'none';
+    if (index !== null) {
+        document.getElementById('modal-title').textContent = 'Редактировать ярлык';
+        document.getElementById('site-name').value = shortcuts[index].name;
+        document.getElementById('site-url').value = shortcuts[index].url;
+        currentTargetIndex = index;
+    } else {
+        document.getElementById('modal-title').textContent = 'Добавить ярлык';
+        document.getElementById('site-name').value = '';
+        document.getElementById('site-url').value = '';
+        currentTargetIndex = null;
+    }
+    siteModal.style.display = 'flex';
+}
+
+document.getElementById('modal-save').addEventListener('click', () => {
+    let name = document.getElementById('site-name').value.trim();
+    let url = document.getElementById('site-url').value.trim();
+
+    if (!name || !url) return alert('Заполните все поля!');
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+
+    if (currentTargetIndex !== null) {
+        shortcuts[currentTargetIndex] = { name, url };
+    } else {
+        shortcuts.push({ name, url });
+    }
+    saveShortcuts();
+    siteModal.style.display = 'none';
+});
+
+document.getElementById('modal-cancel').addEventListener('click', () => siteModal.style.display = 'none');
+document.getElementById('ctx-edit').addEventListener('click', () => openSiteModal(currentTargetIndex));
+document.getElementById('ctx-delete').addEventListener('click', () => {
+    ctxMenu.style.display = 'none';
+    if (confirm(`Удалить ${shortcuts[currentTargetIndex].name}?`)) {
+        shortcuts.splice(currentTargetIndex, 1);
+        saveShortcuts();
+    }
+});
+
+document.addEventListener('click', () => ctxMenu.style.display = 'none');
+
+// --- Управление Контекстным Цветом (Темизация) ---
+function setSystemAccentColor(hexColor) {
+    localStorage.setItem('gor_accent_color', hexColor);
+    document.documentElement.style.setProperty('--accent-color', hexColor);
+
+    // Превращаем HEX в RGBA для красивого мягкого свечения и прозрачных рамок
+    const r = parseInt(hexColor.slice(1, 3), 16);
+    const g = parseInt(hexColor.slice(3, 5), 16);
+    const b = parseInt(hexColor.slice(5, 7), 16);
+
+    document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.6)`);
+    document.documentElement.style.setProperty('--accent-glow-muted', `rgba(${r}, ${g}, ${b}, 0.25)`);
+    document.documentElement.style.setProperty('--accent-border', `rgba(${r}, ${g}, ${b}, 0.2)`);
+
+    customColorPicker.value = hexColor;
+
+    // Синхронизируем класс active на пресетах кружков
+    document.querySelectorAll('.color-preset').forEach(p => {
+        if (p.dataset.color.toLowerCase() === hexColor.toLowerCase()) {
+            p.classList.add('active');
+        } else {
+            p.classList.remove('active');
+        }
+    });
+}
+
+// Клик по готовым кружкам-пресетам
+document.querySelectorAll('.color-preset').forEach(preset => {
+    preset.addEventListener('click', (e) => {
+        setSystemAccentColor(e.target.dataset.color);
+    });
+});
+
+// Изменение цвета через ручную палитру input[type="color"]
+customColorPicker.addEventListener('input', (e) => {
+    setSystemAccentColor(e.target.value);
+});
+
+function loadAccentColor() {
+    const savedColor = localStorage.getItem('gor_accent_color') || '#4c6ef5';
+    setSystemAccentColor(savedColor);
+}
+
+// --- Управление Поисковыми Системами ---
+function buildEngineSelect() {
+    engineSelect.innerHTML = '';
+    engines.forEach((eng, idx) => {
+        const opt = document.createElement('option');
+        opt.value = idx;
+        opt.textContent = eng.name;
+        if (idx === currentEngineIndex) opt.selected = true;
+        engineSelect.appendChild(opt);
+    });
+}
+
+function applySearchEngine() {
+    if (currentEngineIndex >= engines.length) currentEngineIndex = 0;
+    const currentEngine = engines[currentEngineIndex];
+    searchForm.action = currentEngine.url;
+    searchInput.name = currentEngine.param;
+    searchInput.placeholder = `Поиск в ${currentEngine.name} или URL...`;
+    localStorage.setItem('gor_search_engine_idx', currentEngineIndex);
+}
+
+engineSelect.addEventListener('change', (e) => {
+    currentEngineIndex = parseInt(e.target.value);
+    applySearchEngine();
+});
+
+document.getElementById('add-custom-engine-btn').addEventListener('click', () => {
+    const nameInput = document.getElementById('custom-engine-name');
+    const urlInput = document.getElementById('custom-engine-url');
+    let name = nameInput.value.trim();
+    let rawUrl = urlInput.value.trim();
+
+    if (!name || !rawUrl) return alert('Заполните поля поисковой системы!');
+
+    let finalUrl = rawUrl;
+    let param = 'q';
+
+    if (rawUrl.includes('?')) {
+        try {
+            const splitParts = rawUrl.split('?');
+            finalUrl = splitParts[0] + '?';
+            const params = new URLSearchParams(splitParts[1]);
+            for (let key of params.keys()) {
+                param = key;
+                break;
+            }
+        } catch (err) { param = 'q'; }
+    } else {
+        finalUrl = rawUrl + '?';
+    }
+
+    engines.push({ name: name, url: finalUrl, param: param });
+    localStorage.setItem('gor_custom_engines_list', JSON.stringify(engines));
+    currentEngineIndex = engines.length - 1;
+
+    buildEngineSelect();
+    applySearchEngine();
+    nameInput.value = ''; urlInput.value = '';
+});
+
+searchForm.addEventListener('submit', (e) => {
+    let value = searchInput.value.trim();
+    if (!value) { e.preventDefault(); return; }
+    const isUrl = /^(https?:\/\/)?([\w\d-]+\.)+\w{2,}(\/.*)?$/i.test(value);
+    if (isUrl) {
+        e.preventDefault();
+        if (!/^https?:\/\//i.test(value)) value = 'https://' + value;
+        window.location.href = value;
+    }
+});
+
+// --- Изменение Текста Брендинга ---
+function applyBrandText() {
+    const savedBrandText = localStorage.getItem('gor_brand_text') || 'GOR // OS';
+    osBrandLogo.textContent = savedBrandText;
+    brandTextInput.value = savedBrandText;
+}
+
+brandTextInput.addEventListener('input', (e) => {
+    const txt = e.target.value.trim() || 'GOR // OS';
+    osBrandLogo.textContent = txt;
+    localStorage.setItem('gor_brand_text', txt);
+});
+
+// --- Управление фоном, Блуром и Кликабельностью ---
+const bgInput = document.getElementById('bg-input');
+document.getElementById('open-bg-settings').addEventListener('click', () => {
+    buildEngineSelect();
+    applyBrandText();
+    loadAccentColor();
+    bgModal.style.display = 'flex';
+});
+document.getElementById('bg-modal-close').addEventListener('click', () => bgModal.style.display = 'none');
+document.getElementById('choose-file-btn').addEventListener('click', () => bgInput.click());
+
+bgInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function (event) {
+            const rawData = event.target.result;
+            if (file.type === "text/html" || file.name.endsWith('.html')) {
+                localStorage.setItem('gor_custom_bg_type', 'html');
+            } else {
+                localStorage.setItem('gor_custom_bg_type', 'image');
+            }
+            localStorage.setItem('gor_custom_bg', rawData);
+            applyBackground(rawData, localStorage.getItem('gor_custom_bg_type'));
+        };
+        reader.readAsDataURL(file);
+    }
+    bgModal.style.display = 'none';
+});
+
+// ГЛОБАЛЬНЫЙ СБРОС ВСЕХ НАСТРОЕК ДО ЗАВОДСКИХ
+document.getElementById('reset-bg-btn').addEventListener('click', () => {
+    if (confirm('Вы уверены, что хотите полностью сбросить ВСЕ настройки интерфейса, кастомные цвета, ярлыки и поисковики?')) {
+        localStorage.clear();
+
+        shortcuts = [...defaultSites];
+        engines = [...defaultEngines];
+        currentEngineIndex = 0;
+
+        document.body.style.backgroundImage = 'none';
+        iframeBg.style.display = 'none';
+        iframeBg.src = '';
+
+        blurSlider.value = 0;
+        blurVal.textContent = '0px';
+        interactCheckbox.checked = false;
+
+        // Переинициализация
+        setSystemAccentColor('#4c6ef5');
+        applyBrandText();
+        buildEngineSelect();
+        applySearchEngine();
+        renderShortcuts();
+        updateBlurEffect();
+        updateInteractivity();
+
+        todos = [];
+        renderTodos();
+        notesTextarea.value = '';
+        initWeather();
+
+        bgModal.style.display = 'none';
+    }
+});
+
+blurSlider.addEventListener('input', (e) => {
+    const val = e.target.value + 'px';
+    blurVal.textContent = val;
+    localStorage.setItem('gor_bg_blur', val);
+    updateBlurEffect();
+});
+
+interactCheckbox.addEventListener('change', (e) => {
+    localStorage.setItem('gor_bg_interactive', e.target.checked);
+    updateInteractivity();
+});
+
+function updateBlurEffect() {
+    const blurValue = localStorage.getItem('gor_bg_blur') || '0px';
+    iframeBg.style.filter = `blur(${blurValue})`;
+    if (localStorage.getItem('gor_custom_bg_type') !== 'html') {
+        document.body.style.backdropFilter = `blur(${blurValue})`;
+    } else {
+        document.body.style.backdropFilter = 'none';
+    }
+}
+
+function updateInteractivity() {
+    const isInteractive = localStorage.getItem('gor_bg_interactive') === 'true';
+    interactCheckbox.checked = isInteractive;
+    if (isInteractive && localStorage.getItem('gor_custom_bg_type') === 'html') {
+        iframeBg.classList.add('interactive-backend');
+    } else {
+        iframeBg.classList.remove('interactive-backend');
+    }
+}
+
+function applyBackground(bgData, type) {
+    if (!bgData) return;
+    if (type === 'html') {
+        document.body.style.backgroundImage = 'none';
+        iframeBg.style.display = 'block';
+        if (iframeBg.src !== bgData) iframeBg.src = bgData;
+    } else {
+        iframeBg.style.display = 'none';
+        iframeBg.src = '';
+        document.body.style.backgroundImage = `url('${bgData}')`;
+    }
+    updateBlurEffect();
+    updateInteractivity();
+}
+
+function updateClock() {
+    const now = new Date();
+    document.getElementById('clock').textContent = now.toTimeString().split(' ')[0];
+    const days = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+    const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+    document.getElementById('date').textContent = `${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+}
+
+// --- Вкладки в модалках (универсально, скопировано на каждую модалку отдельно) ---
+document.querySelectorAll('.modal-tab').forEach(tabBtn => {
+    tabBtn.addEventListener('click', () => {
+        const scope = tabBtn.closest('.modal-content-tabbed');
+        scope.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+        scope.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+
+        tabBtn.classList.add('active');
+        document.getElementById(tabBtn.dataset.tab).classList.add('active');
+    });
+});
+
+// --- Модалка управления виджетами (видимость + свои виджеты) ---
+const widgetSettingsModal = document.getElementById('widget-settings-modal');
+document.getElementById('widget-settings-btn').addEventListener('click', () => {
+    syncVisibilityCheckboxes();
+    renderCustomWidgetManageList();
+    widgetSettingsModal.style.display = 'flex';
+});
+document.getElementById('widget-settings-close').addEventListener('click', () => {
+    widgetSettingsModal.style.display = 'none';
+});
+
+// --- Видимость встроенных виджетов ---
+function loadWidgetVisibility() {
+    return JSON.parse(localStorage.getItem('gor_widget_visibility')) || {};
+}
+
+function saveWidgetVisibility(vis) {
+    localStorage.setItem('gor_widget_visibility', JSON.stringify(vis));
+}
+
+function applyWidgetVisibility() {
+    const vis = loadWidgetVisibility();
+    document.querySelectorAll('.widget-vis-toggle').forEach(cb => {
+        const widgetId = cb.dataset.widgetId;
+        const isHidden = vis[widgetId] === false;
+        const el = document.getElementById(widgetId);
+        if (el) el.style.display = isHidden ? 'none' : '';
+    });
+}
+
+function syncVisibilityCheckboxes() {
+    const vis = loadWidgetVisibility();
+    document.querySelectorAll('.widget-vis-toggle').forEach(cb => {
+        cb.checked = vis[cb.dataset.widgetId] !== false;
+    });
+}
+
+document.querySelectorAll('.widget-vis-toggle').forEach(cb => {
+    cb.addEventListener('change', () => {
+        const vis = loadWidgetVisibility();
+        vis[cb.dataset.widgetId] = cb.checked;
+        saveWidgetVisibility(vis);
+        applyWidgetVisibility();
+    });
+});
+
+// --- Свои виджеты (HTML/CSS/JS, рендерятся в изолированном iframe) ---
+let customWidgets = JSON.parse(localStorage.getItem('gor_custom_widgets')) || [];
+const customWidgetsContainer = document.getElementById('custom-widgets-container');
+const customWidgetManageList = document.getElementById('custom-widgets-manage-list');
+
+function saveCustomWidgets() {
+    localStorage.setItem('gor_custom_widgets', JSON.stringify(customWidgets));
+}
+
+function buildWidgetSrcdoc(widget) {
+    const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-color').trim() || '#4c6ef5';
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+        :root { --accent-color: ${accentColor}; }
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 4px; color: #f1f3f5; font-family: 'Segoe UI', Roboto, sans-serif; background: transparent; overflow: auto; }
+        ${widget.css || ''}
+    </style></head><body>${widget.html || ''}<script>
+    try {
+        ${widget.js || ''}
+    } catch (e) { console.error('Widget error:', e); }
+    <\/script></body></html>`;
+}
+
+function renderCustomWidgetsInPanel() {
+    customWidgetsContainer.innerHTML = '';
+    customWidgets.forEach(widget => {
+        const card = document.createElement('div');
+        card.className = 'widget-card custom-widget-card';
+        card.id = 'custom-' + widget.id;
+        card.style.display = widget.visible === false ? 'none' : '';
+
+        const header = document.createElement('div');
+        header.className = 'widget-header';
+        header.innerHTML = `<span class="widget-title">${escapeHtml(widget.name)}</span>`;
+
+        const body = document.createElement('div');
+        body.className = 'widget-body';
+
+        const iframe = document.createElement('iframe');
+        iframe.className = 'custom-widget-frame';
+        iframe.setAttribute('sandbox', 'allow-scripts allow-forms allow-modals allow-popups');
+        iframe.srcdoc = buildWidgetSrcdoc(widget);
+
+        body.appendChild(iframe);
+        card.appendChild(header);
+        card.appendChild(body);
+        customWidgetsContainer.appendChild(card);
+    });
+}
+
+function renderCustomWidgetManageList() {
+    customWidgetManageList.innerHTML = '';
+    if (customWidgets.length === 0) {
+        customWidgetManageList.innerHTML = '<div class="widget-empty-hint">Пока нет своих виджетов</div>';
+        return;
+    }
+    customWidgets.forEach(widget => {
+        const row = document.createElement('div');
+        row.className = 'custom-widget-manage-item';
+
+        const name = document.createElement('span');
+        name.className = 'cw-name';
+        name.textContent = widget.name;
+
+        const actions = document.createElement('div');
+        actions.className = 'cw-actions';
+
+        const visToggle = document.createElement('input');
+        visToggle.type = 'checkbox';
+        visToggle.className = 'widget-vis-toggle';
+        visToggle.checked = widget.visible !== false;
+        visToggle.title = 'Показывать виджет';
+        visToggle.addEventListener('change', () => {
+            widget.visible = visToggle.checked;
+            saveCustomWidgets();
+            renderCustomWidgetsInPanel();
+        });
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'cw-delete-btn';
+        delBtn.textContent = '✕';
+        delBtn.title = 'Удалить виджет';
+        delBtn.addEventListener('click', () => {
+            if (confirm(`Удалить виджет "${widget.name}"?`)) {
+                customWidgets = customWidgets.filter(w => w.id !== widget.id);
+                saveCustomWidgets();
+                renderCustomWidgetsInPanel();
+                renderCustomWidgetManageList();
+            }
+        });
+
+        actions.appendChild(visToggle);
+        actions.appendChild(delBtn);
+        row.appendChild(name);
+        row.appendChild(actions);
+        customWidgetManageList.appendChild(row);
+    });
+}
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+document.getElementById('custom-widget-add-btn').addEventListener('click', () => {
+    const nameInput = document.getElementById('custom-widget-name');
+    const htmlInput = document.getElementById('custom-widget-html');
+    const cssInput = document.getElementById('custom-widget-css');
+    const jsInput = document.getElementById('custom-widget-js');
+
+    const name = nameInput.value.trim();
+    if (!name) return alert('Введите название виджета!');
+    if (!htmlInput.value.trim() && !jsInput.value.trim()) return alert('Добавьте хотя бы HTML или JS-код!');
+
+    customWidgets.push({
+        id: 'w' + Date.now(),
+        name,
+        html: htmlInput.value,
+        css: cssInput.value,
+        js: jsInput.value,
+        visible: true
+    });
+    saveCustomWidgets();
+    renderCustomWidgetsInPanel();
+    renderCustomWidgetManageList();
+
+    nameInput.value = '';
+    htmlInput.value = '';
+    cssInput.value = '';
+    jsInput.value = '';
+});
+
+// ============ ВИДЖЕТЫ ============
+
+// --- Открытие/закрытие панели ---
+const widgetsPanel = document.getElementById('widgets-panel');
+document.getElementById('open-widgets-panel').addEventListener('click', () => {
+    widgetsPanel.classList.add('open');
+});
+document.getElementById('widgets-close').addEventListener('click', () => {
+    widgetsPanel.classList.remove('open');
+});
+
+// --- Погода (Open-Meteo, без ключа API) ---
+const weatherBody = document.getElementById('weather-body');
+
+const weatherCodeMap = {
+    0: ['☀️', 'Ясно'],
+    1: ['🌤️', 'Преимущественно ясно'],
+    2: ['⛅', 'Переменная облачность'],
+    3: ['☁️', 'Пасмурно'],
+    45: ['🌫️', 'Туман'],
+    48: ['🌫️', 'Изморозь'],
+    51: ['🌦️', 'Лёгкая морось'],
+    53: ['🌦️', 'Морось'],
+    55: ['🌧️', 'Сильная морось'],
+    61: ['🌧️', 'Небольшой дождь'],
+    63: ['🌧️', 'Дождь'],
+    65: ['🌧️', 'Сильный дождь'],
+    71: ['🌨️', 'Небольшой снег'],
+    73: ['🌨️', 'Снег'],
+    75: ['❄️', 'Сильный снег'],
+    77: ['❄️', 'Снежная крупа'],
+    80: ['🌦️', 'Ливень'],
+    81: ['🌧️', 'Сильный ливень'],
+    82: ['⛈️', 'Очень сильный ливень'],
+    85: ['🌨️', 'Снегопад'],
+    86: ['❄️', 'Сильный снегопад'],
+    95: ['⛈️', 'Гроза'],
+    96: ['⛈️', 'Гроза с градом'],
+    99: ['⛈️', 'Сильная гроза с градом']
+};
+
+function renderWeatherError(msg) {
+    weatherBody.innerHTML = `<div class="weather-status">${msg}</div>`;
+}
+
+async function fetchWeather(lat, lon) {
+    weatherBody.innerHTML = `<div class="weather-status">Загружаем погоду…</div>`;
+    try {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m&timezone=auto`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('bad response');
+        const data = await res.json();
+        const cur = data.current;
+        const [icon, desc] = weatherCodeMap[cur.weather_code] || ['🌡️', 'Неизвестно'];
+        const temp = Math.round(cur.temperature_2m);
+
+        weatherBody.innerHTML = `
+            <div class="weather-main">
+                <div class="weather-icon">${icon}</div>
+                <div>
+                    <div class="weather-temp">${temp}°C</div>
+                    <div class="weather-desc">${desc}</div>
+                </div>
+            </div>
+            <div class="weather-meta">Влажность: ${cur.relative_humidity_2m}% · Ветер: ${Math.round(cur.wind_speed_10m)} км/ч</div>
+        `;
+        localStorage.setItem('gor_last_coords', JSON.stringify({ lat, lon }));
+    } catch (err) {
+        renderWeatherError('Не удалось загрузить погоду. Попробуйте обновить.');
+    }
+}
+
+function initWeather() {
+    if (!navigator.geolocation) {
+        renderWeatherError('Геолокация недоступна в этом браузере.');
+        return;
+    }
+    navigator.geolocation.getCurrentPosition(
+        (pos) => fetchWeather(pos.coords.latitude, pos.coords.longitude),
+        () => {
+            const cached = localStorage.getItem('gor_last_coords');
+            if (cached) {
+                const { lat, lon } = JSON.parse(cached);
+                fetchWeather(lat, lon);
+            } else {
+                renderWeatherError('Доступ к геолокации не разрешён. Разрешите доступ, чтобы видеть погоду.');
+            }
+        },
+        { timeout: 8000 }
+    );
+}
+
+document.getElementById('weather-refresh').addEventListener('click', initWeather);
+
+// --- Калькулятор ---
+const calcDisplay = document.getElementById('calc-display');
+let calcCurrent = '0';
+let calcPrevious = null;
+let calcOperator = null;
+let calcResetOnNextInput = false;
+
+function calcUpdateDisplay() {
+    calcDisplay.textContent = calcCurrent.replace('.', ',');
+}
+
+function calcInputNumber(num) {
+    if (calcResetOnNextInput) {
+        calcCurrent = '0';
+        calcResetOnNextInput = false;
+    }
+    if (calcCurrent === '0' && num !== '.') {
+        calcCurrent = num;
+    } else {
+        if (calcCurrent.length >= 14) return;
+        calcCurrent += num;
+    }
+    calcUpdateDisplay();
+}
+
+function calcInputDecimal() {
+    if (calcResetOnNextInput) {
+        calcCurrent = '0';
+        calcResetOnNextInput = false;
+    }
+    if (!calcCurrent.includes('.')) {
+        calcCurrent += '.';
+        calcUpdateDisplay();
+    }
+}
+
+function calcCompute(a, b, op) {
+    switch (op) {
+        case '+': return a + b;
+        case '-': return a - b;
+        case '*': return a * b;
+        case '/': return b === 0 ? NaN : a / b;
+        default: return b;
+    }
+}
+
+function calcFormatResult(num) {
+    if (isNaN(num)) return 'Ошибка';
+    let str = String(Math.round(num * 1e10) / 1e10);
+    if (str.length > 14) str = num.toExponential(6);
+    return str;
+}
+
+function calcHandleOperator(op) {
+    const inputValue = parseFloat(calcCurrent);
+    if (calcOperator && !calcResetOnNextInput) {
+        const result = calcCompute(calcPrevious, inputValue, calcOperator);
+        calcCurrent = calcFormatResult(result);
+        calcPrevious = parseFloat(calcCurrent);
+        calcUpdateDisplay();
+    } else {
+        calcPrevious = inputValue;
+    }
+    calcOperator = op;
+    calcResetOnNextInput = true;
+}
+
+function calcHandleEquals() {
+    if (calcOperator === null || calcPrevious === null) return;
+    const inputValue = parseFloat(calcCurrent);
+    const result = calcCompute(calcPrevious, inputValue, calcOperator);
+    calcCurrent = calcFormatResult(result);
+    calcOperator = null;
+    calcPrevious = null;
+    calcResetOnNextInput = true;
+    calcUpdateDisplay();
+}
+
+function calcClearAll() {
+    calcCurrent = '0';
+    calcPrevious = null;
+    calcOperator = null;
+    calcResetOnNextInput = false;
+    calcUpdateDisplay();
+}
+
+function calcToggleSign() {
+    if (calcCurrent === '0') return;
+    calcCurrent = calcCurrent.startsWith('-') ? calcCurrent.slice(1) : '-' + calcCurrent;
+    calcUpdateDisplay();
+}
+
+function calcPercent() {
+    calcCurrent = calcFormatResult(parseFloat(calcCurrent) / 100);
+    calcUpdateDisplay();
+}
+
+document.querySelectorAll('#calculator-widget .calc-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        if (btn.dataset.num !== undefined) {
+            calcInputNumber(btn.dataset.num);
+        } else if (btn.dataset.op) {
+            calcHandleOperator(btn.dataset.op);
+        } else if (btn.dataset.action === 'decimal') {
+            calcInputDecimal();
+        } else if (btn.dataset.action === 'clear') {
+            calcClearAll();
+        } else if (btn.dataset.action === 'sign') {
+            calcToggleSign();
+        } else if (btn.dataset.action === 'percent') {
+            calcPercent();
+        } else if (btn.dataset.action === 'equals') {
+            calcHandleEquals();
+        }
+    });
+});
+
+document.getElementById('calc-clear-all').addEventListener('click', calcClearAll);
+
+// --- Дела (Todo) ---
+let todos = JSON.parse(localStorage.getItem('gor_todos')) || [];
+const todoList = document.getElementById('todo-list');
+const todoForm = document.getElementById('todo-form');
+const todoInput = document.getElementById('todo-input');
+
+function saveTodos() {
+    localStorage.setItem('gor_todos', JSON.stringify(todos));
+}
+
+function renderTodos() {
+    todoList.innerHTML = '';
+    if (todos.length === 0) {
+        todoList.innerHTML = '<div class="todo-empty">Пока нет задач</div>';
+        return;
+    }
+    todos.forEach((todo, index) => {
+        const item = document.createElement('div');
+        item.className = 'todo-item' + (todo.done ? ' done' : '');
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = todo.done;
+        checkbox.addEventListener('change', () => {
+            todos[index].done = checkbox.checked;
+            saveTodos();
+            renderTodos();
+        });
+
+        const text = document.createElement('span');
+        text.className = 'todo-text';
+        text.textContent = todo.text;
+        text.addEventListener('click', () => {
+            checkbox.checked = !checkbox.checked;
+            todos[index].done = checkbox.checked;
+            saveTodos();
+            renderTodos();
+        });
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'todo-delete';
+        delBtn.textContent = '✕';
+        delBtn.addEventListener('click', () => {
+            todos.splice(index, 1);
+            saveTodos();
+            renderTodos();
+        });
+
+        item.appendChild(checkbox);
+        item.appendChild(text);
+        item.appendChild(delBtn);
+        todoList.appendChild(item);
+    });
+}
+
+todoForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const val = todoInput.value.trim();
+    if (!val) return;
+    todos.push({ text: val, done: false });
+    saveTodos();
+    renderTodos();
+    todoInput.value = '';
+});
+
+// --- Заметки (автосохранение) ---
+const notesTextarea = document.getElementById('notes-textarea');
+const notesSaveHint = document.getElementById('notes-save-hint');
+let notesSaveTimeout = null;
+
+notesTextarea.value = localStorage.getItem('gor_notes') || '';
+
+notesTextarea.addEventListener('input', () => {
+    clearTimeout(notesSaveTimeout);
+    notesSaveTimeout = setTimeout(() => {
+        localStorage.setItem('gor_notes', notesTextarea.value);
+        notesSaveHint.textContent = 'Сохранено';
+        notesSaveHint.classList.add('show');
+        setTimeout(() => notesSaveHint.classList.remove('show'), 1200);
+    }, 500);
+});
+
+// Инициализация виджетов
+renderTodos();
+initWeather();
+applyWidgetVisibility();
+renderCustomWidgetsInPanel();
+
+// Запуск
+setInterval(updateClock, 1000);
+updateClock();
+renderShortcuts();
+buildEngineSelect();
+applySearchEngine();
+applyBrandText();
+loadAccentColor();
+
+const savedBlur = localStorage.getItem('gor_bg_blur') || '0px';
+blurSlider.value = parseInt(savedBlur);
+blurVal.textContent = savedBlur;
+
+applyBackground(localStorage.getItem('gor_custom_bg'), localStorage.getItem('gor_custom_bg_type'));
